@@ -1,5 +1,9 @@
 package com.jinseonkim.photocloud.storage;
 
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.jinseonkim.photocloud.awsService.AwsS3Service;
 import com.jinseonkim.photocloud.model.InfoModel;
 import com.jinseonkim.photocloud.model.PhotoModel;
 import com.jinseonkim.photocloud.model.PhotoRepository;
@@ -11,6 +15,7 @@ import org.springframework.util.FileSystemUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -25,43 +30,47 @@ import java.util.stream.Stream;
 public class FileSystemStorageService implements StorageService {
 
     private final Path rootLocation;
+    private final AwsS3Service awsS3Service;
 
     @Autowired
     private PhotoRepository repository;
 
     @Autowired
-    public FileSystemStorageService(StorageProperties properties) {
+    public FileSystemStorageService(StorageProperties properties, AwsS3Service awsService) {
         this.rootLocation = Paths.get(properties.getLocation());
+        this.awsS3Service = awsService;
     }
 
     @Override
     public void store(MultipartFile file, InfoModel info) {
         String filename = StringUtils.cleanPath(file.getOriginalFilename());
-        try {
-            if (file.isEmpty()) {
-                throw new RuntimeException("Failed to store empty file " + filename);
-            }
-            if (filename.contains("..")) {
-                // This is a security check
-                throw new RuntimeException(
-                        "Cannot store file with relative path outside current directory "
-                                + filename);
-            }
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, this.rootLocation.resolve(filename),
-                        StandardCopyOption.REPLACE_EXISTING);
-                PhotoModel photo = new PhotoModel();
-                photo.setIdentifier(info.getIdentifier());
-                photo.setCreatedDate(info.getCreatedDate());
-                photo.setImage(this.rootLocation.resolve(filename).toString());
-                photo.setName(filename);
+        if (file.isEmpty()) {
+            throw new RuntimeException("Failed to store empty file " + filename);
+        }
+        if (filename.contains("..")) {
+            // This is a security check
+            throw new RuntimeException(
+                    "Cannot store file with relative path outside current directory "
+                            + filename);
+        }
+        PhotoModel photo = new PhotoModel();
+        photo.setIdentifier(info.getIdentifier());
+        photo.setCreatedDate(info.getCreatedDate());
+        photo.setImage(this.rootLocation.resolve(filename).toString());
+        photo.setName(filename);
 
-                repository.save(photo);
-            }
-        }
-        catch (IOException e) {
-            throw new RuntimeException("Failed to store file " + filename, e);
-        }
+        repository.save(photo);
+        awsS3Service.uploadFile(file);
+//        try {
+//
+//            try (InputStream inputStream = file.getInputStream()) {
+//                Files.copy(inputStream, this.rootLocation.resolve(filename),
+//                        StandardCopyOption.REPLACE_EXISTING);
+//
+//            }
+//        } catch (IOException e) {
+//            throw new RuntimeException("Failed to store file " + filename, e);
+//        }
     }
 
     @Override
@@ -108,7 +117,7 @@ public class FileSystemStorageService implements StorageService {
 
     @Override
     public void deletePhoto(PhotoModel photoModel) {
-        repository.delete(photoModel);
+        repository.deletePhotoModelByIdentifier(photoModel.getIdentifier());
         try {
             FileSystemUtils.deleteRecursively(rootLocation.resolve(photoModel.getName()));
         } catch (IOException e) {

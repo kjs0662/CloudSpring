@@ -82,7 +82,8 @@ public class CloudController {
             return "Fail delete";
         }
         for (InfoModel info : infos) {
-
+            PhotoModel photo = repository.findPhotoModelByIdentifier(info.getIdentifier());
+            storageService.deletePhoto(photo);
         }
         return "Delete Success";
     }

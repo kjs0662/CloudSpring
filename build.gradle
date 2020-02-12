@@ -16,6 +16,9 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.228')
+	implementation 'com.amazonaws:aws-java-sdk-s3'
+	compile "javax.xml.bind:jaxb-api"
 	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
 	testImplementation('org.springframework.boot:spring-boot-starter-test') {
 		exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
