@@ -1,5 +1,8 @@
 package com.jinseonkim.photocloud.storage;
 
+import com.jinseonkim.photocloud.model.InfoModel;
+import com.jinseonkim.photocloud.model.PhotoModel;
+import com.jinseonkim.photocloud.model.PhotoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -15,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.stream.Stream;
 
 @Service
@@ -23,12 +27,15 @@ public class FileSystemStorageService implements StorageService {
     private final Path rootLocation;
 
     @Autowired
+    private PhotoRepository repository;
+
+    @Autowired
     public FileSystemStorageService(StorageProperties properties) {
         this.rootLocation = Paths.get(properties.getLocation());
     }
 
     @Override
-    public void store(MultipartFile file) {
+    public void store(MultipartFile file, InfoModel info) {
         String filename = StringUtils.cleanPath(file.getOriginalFilename());
         try {
             if (file.isEmpty()) {
@@ -43,6 +50,13 @@ public class FileSystemStorageService implements StorageService {
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, this.rootLocation.resolve(filename),
                         StandardCopyOption.REPLACE_EXISTING);
+                PhotoModel photo = new PhotoModel();
+                photo.setIdentifier(info.getIdentifier());
+                photo.setCreatedDate(info.getCreatedDate());
+                photo.setImage(this.rootLocation.resolve(filename).toString());
+                photo.setName(filename);
+
+                repository.save(photo);
             }
         }
         catch (IOException e) {
@@ -90,6 +104,17 @@ public class FileSystemStorageService implements StorageService {
     @Override
     public void deleteAll() {
         FileSystemUtils.deleteRecursively(rootLocation.toFile());
+    }
+
+    @Override
+    public void deletePhoto(PhotoModel photoModel) {
+        repository.delete(photoModel);
+        try {
+            FileSystemUtils.deleteRecursively(rootLocation.resolve(photoModel.getName()));
+        } catch (IOException e) {
+            throw new RuntimeException("Could not delete file: ", e);
+        }
+
     }
 
     @Override
