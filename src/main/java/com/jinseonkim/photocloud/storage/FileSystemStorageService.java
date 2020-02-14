@@ -53,24 +53,18 @@ public class FileSystemStorageService implements StorageService {
                     "Cannot store file with relative path outside current directory "
                             + filename);
         }
-        PhotoModel photo = new PhotoModel();
-        photo.setIdentifier(info.getIdentifier());
-        photo.setCreatedDate(info.getCreatedDate());
-        photo.setImage(this.rootLocation.resolve(filename).toString());
-        photo.setName(filename);
 
-        repository.save(photo);
-        awsS3Service.uploadFile(file);
-//        try {
-//
-//            try (InputStream inputStream = file.getInputStream()) {
-//                Files.copy(inputStream, this.rootLocation.resolve(filename),
-//                        StandardCopyOption.REPLACE_EXISTING);
-//
-//            }
-//        } catch (IOException e) {
-//            throw new RuntimeException("Failed to store file " + filename, e);
-//        }
+        PhotoModel photo = new PhotoModel();
+
+        PhotoModel savedModel = repository.findPhotoModelByIdentifier(info.getIdentifier());
+        if (savedModel == null) {
+            String fileUrl = awsS3Service.uploadFile(file);
+            photo.setIdentifier(info.getIdentifier());
+            photo.setCreatedDate(info.getCreatedDate());
+            photo.setImage(fileUrl);
+            photo.setName(filename);
+            repository.save(photo);
+        }
     }
 
     @Override
@@ -113,11 +107,13 @@ public class FileSystemStorageService implements StorageService {
     @Override
     public void deleteAll() {
         FileSystemUtils.deleteRecursively(rootLocation.toFile());
+        repository.deleteAll();
     }
 
     @Override
     public void deletePhoto(PhotoModel photoModel) {
         repository.deletePhotoModelByIdentifier(photoModel.getIdentifier());
+        awsS3Service.deleteFile(photoModel.getName());
         try {
             FileSystemUtils.deleteRecursively(rootLocation.resolve(photoModel.getName()));
         } catch (IOException e) {

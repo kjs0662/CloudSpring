@@ -8,6 +8,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,22 +54,26 @@ public class AwsS3Service {
     public String uploadFile(MultipartFile multipartFile) {
 
         String fileUrl = "";
-        try {
-            File file = convertMultiPartToFile(multipartFile);
-            fileUrl = endpoint + "/" + imageBucketName + "/" + multipartFile.getOriginalFilename();
-            uploadFileTos3bucket(file, multipartFile.getOriginalFilename());
-            file.delete();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        File file = convertMultiPartToFile(multipartFile);
+        fileUrl = endpoint + "/" + imageBucketName + "/" + multipartFile.getOriginalFilename();
+        uploadFileTos3bucket(file, multipartFile.getOriginalFilename());
+        file.delete();
         return fileUrl;
     }
 
-    private File convertMultiPartToFile(MultipartFile file) throws IOException {
-        File convFile = new File(file.getOriginalFilename());
-        FileOutputStream fos = new FileOutputStream(convFile);
-        fos.write(file.getBytes());
-        fos.close();
-        return convFile;
+    public void deleteFile(String name) {
+        s3Client.deleteObject(imageBucketName, name);
+    }
+
+    private File convertMultiPartToFile(MultipartFile file) {
+        try {
+            File convFile = new File(file.getOriginalFilename());
+            FileOutputStream fos = new FileOutputStream(convFile);
+            fos.write(file.getBytes());
+            fos.close();
+            return convFile;
+        } catch (IOException e) {
+            throw  new RuntimeException("Could not convert MultipartFile to File", e);
+        }
     }
 }
