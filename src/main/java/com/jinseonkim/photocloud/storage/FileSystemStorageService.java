@@ -15,7 +15,9 @@ import org.springframework.util.FileSystemUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.*;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -59,9 +61,11 @@ public class FileSystemStorageService implements StorageService {
         PhotoModel savedModel = repository.findPhotoModelByIdentifier(info.getIdentifier());
         if (savedModel == null) {
             String fileUrl = awsS3Service.uploadFile(file);
+            String thumbUrl = awsS3Service.uploadThumbnail(file);
             photo.setIdentifier(info.getIdentifier());
             photo.setCreatedDate(info.getCreatedDate());
             photo.setImage(fileUrl);
+            photo.setThumbnail(thumbUrl);
             photo.setName(filename);
             repository.save(photo);
         }

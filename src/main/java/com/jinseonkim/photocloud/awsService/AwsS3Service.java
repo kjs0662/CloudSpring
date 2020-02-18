@@ -11,15 +11,19 @@ import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
+import com.jinseonkim.photocloud.imageService.ImageCompressing;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.PostConstruct;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.awt.image.Raster;
+import java.io.*;
 
 @Service
 public class AwsS3Service {
@@ -28,6 +32,9 @@ public class AwsS3Service {
 
     @Value("jinseon-photo-bucket")
     private String imageBucketName;
+
+    @Value("jinseon-thumbnail-bucket")
+    private String thumbnailBucketName;
 
     @Value("https://s3.ap-northeast-1.amazonaws.com")
     private String endpoint;
@@ -47,8 +54,32 @@ public class AwsS3Service {
                 .build();
     }
 
-    private void uploadFileTos3bucket(File file, String name) {
-        s3Client.putObject(new PutObjectRequest(imageBucketName, name, file));
+    public String uploadThumbnail(MultipartFile multipartFile) {
+        String fileUrl = "";
+        File file = convertMultiPartToFile(multipartFile);
+        String fileName = "thumb-" + multipartFile.getOriginalFilename();
+        fileUrl = endpoint + "/" + thumbnailBucketName + "/" + fileName;
+
+        BufferedImage image = null;
+        try {
+            image = ImageIO.read(file);
+            byte[] pixels = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+            byte[] imageData = new ImageCompressing().compressedImage(pixels, image.getWidth(), image.getHeight());
+
+            BufferedImage img = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_3BYTE_BGR);
+            img.setData(Raster.createRaster(img.getSampleModel(), new DataBufferByte(imageData, imageData.length), new Point()));
+            ImageIO.write(img, "jpg", new File(fileName));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("", e);
+        }
+
+        File thumbFile = new File("thumb-" + multipartFile.getOriginalFilename());
+        s3Client.putObject(new PutObjectRequest(thumbnailBucketName, fileName, thumbFile));
+        thumbFile.delete();
+
+        return fileUrl;
     }
 
     public String uploadFile(MultipartFile multipartFile) {
@@ -56,13 +87,15 @@ public class AwsS3Service {
         String fileUrl = "";
         File file = convertMultiPartToFile(multipartFile);
         fileUrl = endpoint + "/" + imageBucketName + "/" + multipartFile.getOriginalFilename();
-        uploadFileTos3bucket(file, multipartFile.getOriginalFilename());
+        s3Client.putObject(new PutObjectRequest(imageBucketName, multipartFile.getOriginalFilename(), file));
+
         file.delete();
         return fileUrl;
     }
 
     public void deleteFile(String name) {
         s3Client.deleteObject(imageBucketName, name);
+        s3Client.deleteObject(thumbnailBucketName, "thumb-" + name);
     }
 
     private File convertMultiPartToFile(MultipartFile file) {

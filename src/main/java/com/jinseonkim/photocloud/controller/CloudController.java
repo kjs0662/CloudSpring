@@ -1,32 +1,17 @@
 package com.jinseonkim.photocloud.controller;
 
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jinseonkim.photocloud.model.InfoModel;
 import com.jinseonkim.photocloud.model.PhotoModel;
 import com.jinseonkim.photocloud.model.PhotoRepository;
 import com.jinseonkim.photocloud.storage.StorageService;
-import org.apache.tomcat.util.json.JSONParser;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jackson.JsonObjectSerializer;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jmx.support.ObjectNameManager;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.util.FileSystemUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder;
-
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 public class CloudController {
@@ -43,6 +28,7 @@ public class CloudController {
     @GetMapping("/")
     public List<PhotoModel> listUploadedFiles() {
         List<PhotoModel> list = repository.findAll();
+//        repository.deleteAll();
         return list;
     }
 
@@ -73,7 +59,7 @@ public class CloudController {
             storageService.store(file, list.get(index));
             index++;
         }
-        return "Success";
+        return "success";
     }
 
     @DeleteMapping("/")
